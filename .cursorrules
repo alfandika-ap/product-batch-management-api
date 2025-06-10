@@ -1,0 +1,139 @@
+# Carabao Product Management API - Product Authentication System
+
+## Project Overview
+
+This is a Node.js API for product authentication using advanced hologram stickers and QR-code + 6-digit PIN technology. The system allows users to verify product authenticity by scanning QR codes and entering PIN codes.
+
+## Tech Stack
+
+- **Runtime**: Bun with TypeScript
+- **Framework**: Elysiajs
+- **Database**: MySQL with Drizzle ORM
+- **Authentication**: JWT tokens
+- **Validation**: Zod schemas
+
+## Database Schema
+
+The system uses 4 main tables:
+
+1. **products**: Product catalog (id, name, category, image_url, description)
+2. **product_batches**: Production batches (id, product_id, batch_code, quantity)
+3. **product_items**: Individual items with QR codes (id, batch_id, qr_code, status, scan_count)
+4. **scan_logs**: Scan history tracking (id, item_id, user_id, scanned_at, location, ip_address, device_info)
+5. **users**: User management (existing table)
+
+## Code Style & Standards
+
+- Use TypeScript with strict mode
+- Follow camelCase for variables and functions
+- Use PascalCase for types and interfaces
+- Add proper error handling with try-catch blocks
+- Use descriptive variable names
+- Add JSDoc comments for complex functions
+- Validate all inputs using Zod schemas
+
+## API Patterns
+
+- RESTful endpoints with proper HTTP methods
+- Use consistent response formats:
+  ```typescript
+  {
+    success: boolean,
+    message: string,
+    data?: any,
+    error?: string
+  }
+  ```
+- Implement proper status codes (200, 201, 400, 401, 404, 500)
+- Add request validation middleware
+- Use async/await instead of promises
+- Implement proper logging
+
+## Security Guidelines
+
+- Validate and sanitize all inputs
+- Use parameterized queries to prevent SQL injection
+- Implement rate limiting for scan endpoints
+- Log security events (failed scans, multiple attempts)
+- Hash sensitive data when necessary
+- Validate QR codes and PIN codes securely
+
+## Database Best Practices
+
+- Use Drizzle ORM for all database operations
+- Implement proper indexes for performance
+- Use transactions for data consistency
+- Add foreign key constraints
+- Use prepared statements
+- Handle database errors gracefully
+
+## Key Endpoints to Implement
+
+1. **POST /api/products** - Create product
+2. **POST /api/batches** - Create product batch
+3. **POST /api/items/generate** - Generate QR codes and PINs for batch
+4. **POST /api/scan/verify** - Verify product authenticity (main endpoint)
+5. **GET /api/items/:qrCode/status** - Check item status
+6. **GET /api/scan/logs/:itemId** - Get scan history
+7. **GET /api/analytics/dashboard** - Analytics dashboard
+
+## Authentication Flow
+
+- User registration/login with JWT
+- Optional anonymous scanning for public verification
+- Admin endpoints require authentication
+- Track user scan activities
+
+## File Structure
+
+```
+src/
+├── db/
+│   ├── schema.ts (database schema)
+│   └── connection.ts (database connection)
+├── routes/
+│   ├── products.ts
+│   ├── batches.ts
+│   ├── items.ts
+│   ├── scan.ts
+│   └── auth.ts
+├── middleware/
+│   ├── auth.ts
+│   ├── validation.ts
+│   └── rateLimit.ts
+├── services/
+│   ├── qrGenerator.ts
+│   ├── pinGenerator.ts
+│   └── scanValidator.ts
+├── types/
+│   └── api.ts
+└── utils/
+    ├── response.ts
+    └── logger.ts
+```
+
+## Environment Variables
+
+- DATABASE_URL
+- JWT_SECRET
+- PORT
+- NODE_ENV
+- CORS_ORIGIN
+
+## Development Notes
+
+- Use environment-specific configurations
+- Implement comprehensive error logging
+- Add unit tests for critical functions
+- Use middleware for common functionality
+- Implement proper CORS configuration
+- Add request/response logging for debugging
+
+## Special Considerations
+
+- QR codes should be unique and secure
+- PIN codes are 6-digit numeric
+- Track scan counts and prevent abuse
+- Implement geolocation tracking if needed
+- Consider offline verification scenarios
+- Add batch operations for bulk item generation

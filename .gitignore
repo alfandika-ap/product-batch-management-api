@@ -1,8 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
-/.pnp
+node_modules/
+.pnp/
 .pnp.js
 
 # testing
@@ -40,3 +40,54 @@ yarn-error.log*
 **/*.log
 package-lock.json
 **/*.bun
+
+# Bun
+bun.lockb
+
+# Environment variables
+.env
+
+# Build outputs
+dist/
+build/
+out/
+
+# Logs
+logs
+*.log
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+*.sublime-workspace
+*.sublime-project
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Project specific
+tmp/
+temp/
+uploads/
+*.sqlite
+*.sqlite3
+
+# Debug
+.debug/
+debug.log
+
+# Production
+.env.production
