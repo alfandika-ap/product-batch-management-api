@@ -69,6 +69,7 @@ export class AuthController {
       
     } catch (error: any) {
       console.error('Login error:', error);
+      context.set.status = 500;
       return ResponseUtil.error(error.message || 'Login gagal');
     }
   }

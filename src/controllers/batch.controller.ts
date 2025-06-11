@@ -7,13 +7,48 @@ import { generateSerialNumber, getLastSequenceNumber } from "../taks/workers/gen
 export class BatchController {
   static async getBatches(context: Context) {
     try {
+
+      const page = context.query?.page ? Number(context.query.page) : 1;
+      const limit = context.query?.limit ? Number(context.query.limit) : 10;
+
+      // Validate pagination parameters
+      if (page < 1) {
+        return ResponseUtil.error('Invalid page number', 'Page number must be greater than 0');
+      }
+      if (limit < 1 || limit > 100) {
+        return ResponseUtil.error('Invalid limit', 'Limit must be between 1 and 100');
+      }
+
       // Get productId from query parameters if provided
       const productId = context.query?.productId ? Number(context.query.productId) : undefined;
-      const batches = await BatchService.getBatches({ productId });
+      const batches = await BatchService.getBatches({ productId, page, limit });
       return ResponseUtil.success(batches, 'Batches retrieved successfully');
     } catch (error) {
       console.error('Error fetching batches:', error);
       return ResponseUtil.error('Failed to retrieve batches', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  static async getBatchItems(context: Context) {
+    try {
+
+      const page = context.query?.page ? Number(context.query.page) : 1;
+      const limit = context.query?.limit ? Number(context.query.limit) : 10;
+
+      // Validate pagination parameters
+      if (page < 1) {
+        return ResponseUtil.error('Invalid page number', 'Page number must be greater than 0');
+      }
+      if (limit < 1 || limit > 100) {
+        return ResponseUtil.error('Invalid limit', 'Limit must be between 1 and 100');
+      }
+
+      const batchId = Number(context.params.id);
+      const items = await BatchService.getBatchItems(batchId, { page, limit });
+      return ResponseUtil.success(items, 'Batch items retrieved successfully');
+    } catch (error) {
+      console.error('Error fetching batch items:', error);
+      return ResponseUtil.error('Failed to retrieve batch items', error instanceof Error ? error.message : 'Unknown error');
     }
   }
 

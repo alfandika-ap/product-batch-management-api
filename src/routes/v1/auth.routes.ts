@@ -59,7 +59,46 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
     }),
     detail: {
       summary: 'Login user',
-      tags: ['Authentication']
+      tags: ['Authentication'],
+      responses: {
+        200: {
+          description: 'Login successful',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean' },
+                  message: { type: 'string' },
+                  data: {
+                    type: 'object',
+                    properties: {
+                      user: { type: 'object' },
+                      accessToken: { type: 'string' },
+                      refreshToken: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        401: {
+          description: 'Invalid credentials',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean' },
+                  message: { type: 'string' },
+                  error: { type: 'string' }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   })
   

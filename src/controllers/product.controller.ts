@@ -6,8 +6,20 @@ import { ProductRequest } from "../types/product.types";
 export class ProductController {
   static async getProducts(context: Context) {
     try {
-      const products = await ProductService.getProducts();
-      return ResponseUtil.success(products, 'Products retrieved successfully');
+      // Extract pagination parameters from query
+      const page = context.query?.page ? Number(context.query.page) : 1;
+      const limit = context.query?.limit ? Number(context.query.limit) : 10;
+
+      // Validate pagination parameters
+      if (page < 1) {
+        return ResponseUtil.error('Invalid page number', 'Page number must be greater than 0');
+      }
+      if (limit < 1 || limit > 100) {
+        return ResponseUtil.error('Invalid limit', 'Limit must be between 1 and 100');
+      }
+
+      const result = await ProductService.getProducts({ page, limit });
+      return ResponseUtil.success(result, 'Products retrieved successfully');
     } catch (error) {
       console.error('Error fetching products:', error);
       return ResponseUtil.error(

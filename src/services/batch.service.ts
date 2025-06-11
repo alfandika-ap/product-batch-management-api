@@ -1,15 +1,65 @@
 import { db } from "../db/connection";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { productBatchesTable, productItemsTable } from "../db/schema";
 import { ProductBatchRequest, ProductItemRequest } from "../types/batch.types";
 import { generateProductBatchItemQueue, updateBatchStatusQueue } from "../taks/queues/generate-product-batch-item-queue";
 
 export class BatchService {
-  static async getBatches(params: { productId?: number }) {
+  static async getBatches(params: { productId?: number, page?: number, limit?: number }) {
+    const page = params?.page || 1;
+    const limit = params?.limit || 10;
+    const offset = (page - 1) * limit;
+
+    const [{ totalCount }] = await db
+      .select({ totalCount: count() })
+      .from(productBatchesTable);
+
     const batches = await db.select()
       .from(productBatchesTable)
-      .where(params.productId ? eq(productBatchesTable.productId, params.productId) : undefined);
-    return batches;
+      .where(params.productId ? eq(productBatchesTable.productId, params.productId) : undefined)
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      batches,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(totalCount / limit),
+        totalItems: totalCount,
+        itemsPerPage: limit,
+        hasNextPage: page < Math.ceil(totalCount / limit),
+        hasPreviousPage: page > 1
+      }
+    };
+  }
+
+  static async getBatchItems(batchId: number, params: { page?: number, limit?: number }) {
+    const page = params?.page || 1;
+    const limit = params?.limit || 10;
+    const offset = (page - 1) * limit;
+    
+    const [{ totalCount }] = await db
+      .select({ totalCount: count() })
+      .from(productItemsTable)
+      .where(eq(productItemsTable.batchId, batchId));
+
+    const items = await db.select()
+      .from(productItemsTable)
+      .where(eq(productItemsTable.batchId, batchId))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(totalCount / limit),
+        totalItems: totalCount,
+        itemsPerPage: limit,
+        hasNextPage: page < Math.ceil(totalCount / limit),
+        hasPreviousPage: page > 1
+      }
+    };
   }
 
   static async createProductBatch(data: ProductBatchRequest) {

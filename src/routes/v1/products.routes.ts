@@ -12,10 +12,30 @@ export const productsRoutes = new Elysia({ prefix: '/products' })
   
   // Public routes - Get products
   .get('/', ProductController.getProducts, {
+    query: t.Optional(t.Object({
+      page: t.Optional(t.Numeric({ minimum: 1 })),
+      limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 }))
+    })),
     detail: {
       summary: 'Get all products',
-      description: 'Retrieve a list of all products in the catalog',
+      description: 'Retrieve a paginated list of all products in the catalog',
       tags: ['Products'],
+      parameters: [
+        {
+          name: 'page',
+          in: 'query',
+          description: 'Page number (default: 1)',
+          required: false,
+          schema: { type: 'number', minimum: 1, default: 1 }
+        },
+        {
+          name: 'limit',
+          in: 'query',
+          description: 'Number of items per page (default: 10, max: 100)',
+          required: false,
+          schema: { type: 'number', minimum: 1, maximum: 100, default: 10 }
+        }
+      ],
       responses: {
         200: {
           description: 'Products retrieved successfully',
@@ -27,16 +47,32 @@ export const productsRoutes = new Elysia({ prefix: '/products' })
                   success: { type: 'boolean' },
                   message: { type: 'string' },
                   data: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        id: { type: 'number' },
-                        name: { type: 'string' },
-                        category: { type: 'string' },
-                        image_url: { type: 'string' },
-                        description: { type: 'string' },
-                        created_at: { type: 'string', format: 'date-time' }
+                    type: 'object',
+                    properties: {
+                      products: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'number' },
+                            name: { type: 'string' },
+                            category: { type: 'string' },
+                            image_url: { type: 'string' },
+                            description: { type: 'string' },
+                            created_at: { type: 'string', format: 'date-time' }
+                          }
+                        }
+                      },
+                      pagination: {
+                        type: 'object',
+                        properties: {
+                          currentPage: { type: 'number' },
+                          totalPages: { type: 'number' },
+                          totalItems: { type: 'number' },
+                          itemsPerPage: { type: 'number' },
+                          hasNextPage: { type: 'boolean' },
+                          hasPreviousPage: { type: 'boolean' }
+                        }
                       }
                     }
                   }
@@ -44,6 +80,9 @@ export const productsRoutes = new Elysia({ prefix: '/products' })
               }
             }
           }
+        },
+        400: {
+          description: 'Invalid pagination parameters'
         }
       }
     }
