@@ -3,6 +3,8 @@ import { count, eq } from "drizzle-orm";
 import { productBatchesTable, productItemsTable } from "../db/schema";
 import { ProductBatchRequest, ProductItemRequest } from "../types/batch.types";
 import { generateProductBatchItemQueue, updateBatchStatusQueue } from "../taks/queues/generate-product-batch-item-queue";
+import QRCode from 'qrcode'
+import { Jimp } from "jimp";
 
 export class BatchService {
   static async getBatches(params: { productId?: number, page?: number, limit?: number }) {
@@ -33,10 +35,33 @@ export class BatchService {
     };
   }
 
+  static async addWatermarkToQrCode(qrCode: string) {
+    const qrBuffer = await QRCode.toBuffer(qrCode, {
+      width: 300,
+      errorCorrectionLevel: 'H'
+    });
+
+    const qrImage = await Jimp.read(qrBuffer);
+    const logo = await Jimp.read('./src/assets/images/carabo-qr-watermark.png');
+  
+    const logoSize = qrImage.bitmap.width * 0.2;
+    logo.resize({w: logoSize, h: logoSize});
+  
+    const x = (qrImage.bitmap.width / 2) - (logo.bitmap.width / 2);
+    const y = (qrImage.bitmap.height / 2) - (logo.bitmap.height / 2);
+  
+    qrImage.composite(logo, x, y);
+  
+    const qrCodeWithWatermark = await qrImage.getBase64("image/png");
+    return qrCodeWithWatermark;
+  }
+  
+
   static async getBatchItems(batchId: number, params: { page?: number, limit?: number }) {
     const page = params?.page || 1;
     const limit = params?.limit || 10;
     const offset = (page - 1) * limit;
+    const WITH_WATERMARK = true;
     
     const [{ totalCount }] = await db
       .select({ totalCount: count() })
@@ -49,8 +74,17 @@ export class BatchService {
       .limit(limit)
       .offset(offset);
 
+    const itemsWithQrCode = await Promise.all(items.map(async (item) => {
+      const qrString = `http://192.168.0.106:5173/scan?qrCode=${item.qrCode}`
+      const qrCodeBase64 = WITH_WATERMARK ? await this.addWatermarkToQrCode(qrString) : await QRCode.toDataURL(qrString);
+      return {
+        ...item,
+        qrCode: qrCodeBase64
+      }
+    }));
+
     return {
-      items,
+      items: itemsWithQrCode,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(totalCount / limit),
