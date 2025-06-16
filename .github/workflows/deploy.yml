@@ -19,11 +19,6 @@ jobs:
       - name: Install Dependencies
         run: bun install
 
-      - name: Build Application
-        run: bun run build
-        env:
-          NODE_ENV: production
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh/
@@ -54,6 +49,5 @@ jobs:
             cd /home/carabaopro-api-check-ssh/htdocs/api-check.carabaopro.com && \
             bun install && \
             npm install pm2 --save-dev && \
-            bun run build && \
             ./node_modules/.bin/pm2 start ecosystem.config.js --update-env && \
             ./node_modules/.bin/pm2 save"

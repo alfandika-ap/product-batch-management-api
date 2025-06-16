@@ -5,7 +5,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "bun run --watch src/index.ts",
     "workers": "bun run scripts/start-workers.ts",
-    "workers:dev": "bun run --watch scripts/start-workers.ts"
+    "workers:dev": "bun run --watch scripts/start-workers.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.3.3",

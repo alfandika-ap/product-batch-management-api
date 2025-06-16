@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'carabao-api',
-      script: './dist/index.js',
+      script: './src/index.ts',
       instances: 1,
       autorestart: true,
       watch: false,
@@ -10,7 +10,8 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3000
-      }
+      },
+      interpreter: 'bun'
     },
     {
       name: 'carabao-workers',
