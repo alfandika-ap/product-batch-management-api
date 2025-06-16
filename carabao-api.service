@@ -1,0 +1,15 @@
+[Unit]
+Description=Carabao Product Management API
+After=network.target
+
+[Service]
+Type=simple
+User=carabaopro-api-check-ssh
+WorkingDirectory=/home/carabaopro-api-check-ssh/htdocs/api-check.carabaopro.com
+ExecStart=/home/carabaopro-api-check-ssh/.bun/bin/bun run start
+Restart=always
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+[Install]
+WantedBy=multi-user.target 
