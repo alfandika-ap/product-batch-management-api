@@ -43,8 +43,9 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           SSH_PASS: ${{ secrets.SSH_PASS }}
         run: |
-          sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST \
+          sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "\
+            export PATH=/usr/local/bin:/usr/bin:\$PATH && \
             cd /home/carabaopro-api-check-ssh/htdocs/api-check.carabaopro.com && \
             bun install && \
-            pm2 start ecosystem.config.js --update-env && \
-            pm2 save
+            /usr/local/bin/pm2 start ecosystem.config.js --update-env && \
+            /usr/local/bin/pm2 save"
