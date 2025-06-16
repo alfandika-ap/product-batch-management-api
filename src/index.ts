@@ -15,12 +15,6 @@ const app = new Elysia()
           email: 'support@carabao.com'
         }
       },
-      servers: [
-        {
-          url: `http://${process.env.HOST || 'localhost'}:${process.env.PORT || 3001}`,
-          description: 'Development server'
-        }
-      ],
       tags: [
         {
           name: 'Authentication',
@@ -82,6 +76,3 @@ console.log(
 console.log(
   `📚 API Documentation available at http://${app.server?.hostname}:${app.server?.port}/swagger`
 );
-
-// Export app for testing purposes
-export default app;
