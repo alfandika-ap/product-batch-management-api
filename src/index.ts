@@ -68,7 +68,10 @@ const app = new Elysia()
     }
   }))
   .use(apiRoutes)
-  .listen(process.env.PORT || 3001);
+  .listen({
+    hostname: "127.0.0.1",
+    port: Number(process.env.PORT) || 3001
+  });
 
 console.log(
   `🦊 Carabao Product Management API is running at ${app.server?.hostname}:${app.server?.port}`
