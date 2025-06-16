@@ -37,7 +37,6 @@ jobs:
             -e "ssh -o StrictHostKeyChecking=no" \
             --exclude='.git' \
             --exclude='node_modules' \
-            --exclude='.env' \
             --exclude='.github' \
             ./ $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/
 
