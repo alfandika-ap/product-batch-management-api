@@ -79,7 +79,7 @@ export class AuthService {
   /**
    * Get user by ID
    */
-  static async getUserById(id: number): Promise<User | null> {
+  static async getUserById(id: string): Promise<User | null> {
     const [user] = await db
       .select()
       .from(usersTable)
@@ -107,7 +107,7 @@ export class AuthService {
   /**
    * Change user password
    */
-  static async changePassword(userId: number, data: PasswordChangeRequest): Promise<void> {
+  static async changePassword(userId: string, data: PasswordChangeRequest): Promise<void> {
     // Get current user
     const [user] = await db
       .select()
@@ -145,7 +145,7 @@ export class AuthService {
   /**
    * Increment token version (invalidate all refresh tokens)
    */
-  static async invalidateUserTokens(userId: number): Promise<void> {
+  static async invalidateUserTokens(userId: string): Promise<void> {
     const [user] = await db
       .select()
       .from(usersTable)
@@ -165,7 +165,7 @@ export class AuthService {
   /**
    * Deactivate user account
    */
-  static async deactivateUser(userId: number): Promise<void> {
+  static async deactivateUser(userId: string): Promise<void> {
     await db
       .update(usersTable)
       .set({ 

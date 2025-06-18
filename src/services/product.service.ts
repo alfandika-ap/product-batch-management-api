@@ -34,7 +34,7 @@ export class ProductService {
     };
   }
 
-  static async getProductById(id: number) {
+  static async getProductById(id: string) {
     const [product] = await db
       .select()
       .from(productsTable)
@@ -48,12 +48,12 @@ export class ProductService {
     return result[0];
   }
 
-  static async updateProduct(id: number, product: ProductRequest) {
+  static async updateProduct(id: string, product: ProductRequest) {
     const result = await db.update(productsTable).set(product).where(eq(productsTable.id, id));
     return result[0];
   }
 
-  static async deleteProduct(id: number) {
+  static async deleteProduct(id: string) {
     const result = await db.delete(productsTable).where(eq(productsTable.id, id));
     return result[0];
   }

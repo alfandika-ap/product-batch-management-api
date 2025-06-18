@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1749474835763,
-      "tag": "0000_bizarre_thor",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1749475652198,
-      "tag": "0001_robust_susan_delgado",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1749509079679,
-      "tag": "0002_sour_deathbird",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1749657421979,
-      "tag": "0003_tense_unicorn",
+      "when": 1750203467561,
+      "tag": "0000_strong_random",
       "breakpoints": true
     }
   ]

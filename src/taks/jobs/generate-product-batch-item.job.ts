@@ -10,7 +10,7 @@ export const UPDATE_BATCH_STATUS_JOB = 'update-batch-status';
  * Job data for generating product batch items in batches
  */
 export interface GenerateProductBatchItemJobData {
-  batchId: number;
+  batchId: string;
   totalQuantity: number;
   batchSize: number;
   startIndex: number;
@@ -22,7 +22,7 @@ export interface GenerateProductBatchItemJobData {
  * Job data for updating batch status
  */
 export interface UpdateBatchStatusJobData {
-  batchId: number;
+  batchId: string;
   status: 'pending' | 'completed' | 'failed';
   error?: string;
   processedCount?: number;

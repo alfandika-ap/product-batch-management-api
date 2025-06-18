@@ -13,7 +13,7 @@ import {
 /**
  * Generate unique QR code for product item
  */
-function generateQRCode(batchId: number, index: number, prefix?: string): string {
+function generateQRCode(batchId: string, index: number, prefix?: string): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
   return prefix ? `${prefix}-${batchId}-${index}-${timestamp}-${random}` : `QR-${batchId}-${index}-${timestamp}-${random}`;
@@ -22,7 +22,7 @@ function generateQRCode(batchId: number, index: number, prefix?: string): string
 /**
  * Get the last sequence number from existing product items in a batch
  */
-export async function getLastSequenceNumber(batchId: number): Promise<number> {
+export async function getLastSequenceNumber(batchId: string): Promise<number> {
   const lastItem = await db
     .select({ serialNumber: productItemsTable.serialNumber })
     .from(productItemsTable)
@@ -51,7 +51,7 @@ export function generateSerialNumber(batchCode: string, index: number, startFrom
  * Create product items in optimized batches
  */
 async function createProductItemsBatch(
-  batchId: number,
+  batchId: string,
   startIndex: number,
   endIndex: number,
   qrCodePrefix?: string
@@ -67,6 +67,7 @@ async function createProductItemsBatch(
       batchId,
       qrCode: generateQRCode(batchId, i, qrCodePrefix),
       serialNumber: generateSerialNumber(batch[0].batchCode, i, lastSequence),
+      itemOrder: i + 1,
     });
   }
 

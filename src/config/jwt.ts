@@ -10,7 +10,7 @@ export const jwtConfig = {
 };
 
 export interface JWTPayload {
-  userId: number;
+  userId: string;
   email: string;
   iat?: number;
   exp?: number;
@@ -19,7 +19,7 @@ export interface JWTPayload {
 }
 
 export interface RefreshTokenPayload {
-  userId: number;
+  userId: string;
   iat?: number;
   exp?: number;
 }

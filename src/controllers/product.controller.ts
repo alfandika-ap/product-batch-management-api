@@ -31,7 +31,7 @@ export class ProductController {
 
   static async getProductById(context: Context) {
     try {
-      const product = await ProductService.getProductById(Number(context.params.id));
+      const product = await ProductService.getProductById(context.params.id);
       
       if (!product) {
         return ResponseUtil.error('Product not found', 'Product with the specified ID does not exist');
@@ -62,7 +62,7 @@ export class ProductController {
 
   static async updateProduct(context: Context & { body: ProductRequest }) {
     try {
-      const product = await ProductService.updateProduct(Number(context.params.id), context.body);
+      const product = await ProductService.updateProduct(context.params.id, context.body);
       
       if (!product) {
         return ResponseUtil.error('Product not found', 'Product with the specified ID does not exist');
@@ -80,7 +80,7 @@ export class ProductController {
 
   static async deleteProduct(context: Context) {
     try {
-      const product = await ProductService.deleteProduct(Number(context.params.id));
+      const product = await ProductService.deleteProduct(context.params.id);
       
       if (!product) {
         return ResponseUtil.error('Product not found', 'Product with the specified ID does not exist');

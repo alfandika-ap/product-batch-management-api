@@ -20,7 +20,7 @@ export class BatchController {
       }
 
       // Get productId from query parameters if provided
-      const productId = context.query?.productId ? Number(context.query.productId) : undefined;
+      const productId = context.query?.productId ? context.query.productId : undefined;
       const batches = await BatchService.getBatches({ productId, page, limit });
       return ResponseUtil.success(batches, 'Batches retrieved successfully');
     } catch (error) {
@@ -43,7 +43,7 @@ export class BatchController {
         return ResponseUtil.error('Invalid limit', 'Limit must be between 1 and 100');
       }
 
-      const batchId = Number(context.params.id);
+      const batchId = context.params.id;
       const items = await BatchService.getBatchItems(batchId, { page, limit });
       return ResponseUtil.success(items, 'Batch items retrieved successfully');
     } catch (error) {
@@ -52,7 +52,7 @@ export class BatchController {
     }
   }
 
-  static async createBatch(context: Context & { body: { product_id: number; batch_code: string; quantity: number } }) {
+  static async createBatch(context: Context & { body: { product_id: string; batch_code: string; quantity: number } }) {
     try {
       // Transform snake_case to camelCase
       const batchRequest: ProductBatchRequest = {
@@ -87,7 +87,8 @@ export class BatchController {
           await BatchService.createProductItem({
             batchId: batch.id,
             qrCode: `QR-${batch.id}-${i}`,
-            serialNumber: generateSerialNumber(batch.batchCode, i, lastSequence)
+            serialNumber: generateSerialNumber(batch.batchCode, i, lastSequence),
+            itemOrder: i + 1
           });
         }
         return ResponseUtil.success(batch, 'Batch created successfully');
@@ -100,7 +101,7 @@ export class BatchController {
 
   static async getBatchProgress(context: Context) {
     try {
-      const batchId = Number(context.params.id);
+      const batchId = context.params.id;
       const progress = await BatchService.getBatchJobProgress(batchId);
       
       if (!progress) {
@@ -111,6 +112,41 @@ export class BatchController {
     } catch (error) {
       console.error('Error fetching batch progress:', error);
       return ResponseUtil.error('Failed to retrieve batch progress', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  static async deleteBatch(context: Context) {
+    try {
+      const batchId = context.params.id;
+      const batch = await BatchService.deleteProductBatch(batchId);
+      return ResponseUtil.success(batch, 'Batch deleted successfully');
+    } catch (error) {
+      if (error instanceof Error) {
+        // Log detailed error information
+        context.set.status = 500;
+        console.error('Error deleting batch:', {
+          message: error.message,
+          stack: error.stack,
+          batchId: context.params.id
+        });
+        
+        // Check for specific database errors
+        if (error.message.includes('foreign key constraint')) {
+          return ResponseUtil.error(
+            'Cannot delete batch', 
+            'This batch has associated product items that must be deleted first'
+          );
+        }
+        
+        if (error.message.includes('not found')) {
+          return ResponseUtil.error(
+            'Batch not found', 
+            'The specified batch does not exist'
+          );
+        }
+      }
+      console.error('Error deleting batch:', error);
+      return ResponseUtil.error('Failed to delete batch', error instanceof Error ? error.message : 'Unknown error');
     }
   }
 }

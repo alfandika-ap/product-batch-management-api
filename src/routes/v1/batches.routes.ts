@@ -16,7 +16,7 @@ export const batchesRoutes = new Elysia({ prefix: "/batches" })
   .get("/", BatchController.getBatches, {
     query: t.Optional(
       t.Object({
-        productId: t.Optional(t.Numeric()),
+        productId: t.Optional(t.String()),
         page: t.Optional(t.Numeric({ minimum: 1 })),
         limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
       })
@@ -222,7 +222,7 @@ export const batchesRoutes = new Elysia({ prefix: "/batches" })
   // Create new batch
   .post("/", BatchController.createBatch, {
     body: t.Object({
-      product_id: t.Number({ minimum: 1 }),
+      product_id: t.String({ minimum: 1 }),
       batch_code: t.String({ minLength: 1, maxLength: 50 }),
       quantity: t.Number({ minimum: 1 }),
     }),
@@ -348,10 +348,7 @@ export const batchesRoutes = new Elysia({ prefix: "/batches" })
   // Delete batch
   .delete(
     "/:id",
-    ({ params }) => ({
-      success: true,
-      message: "Batch deleted successfully",
-    }),
+    BatchController.deleteBatch,
     {
       params: t.Object({
         id: t.String(),

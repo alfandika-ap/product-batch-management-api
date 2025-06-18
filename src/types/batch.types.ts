@@ -1,12 +1,13 @@
 export type ProductBatchRequest = {
-  productId: number;
+  productId: string;
   batchCode: string;
   quantity: number;
   generateProductItemsStatus?: 'pending' | 'completed' | 'failed';
 };
 
 export type ProductItemRequest = {
-  batchId: number;
+  batchId: string;
   qrCode: string;
   serialNumber: string;
+  itemOrder: number;
 };

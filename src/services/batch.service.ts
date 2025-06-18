@@ -1,5 +1,5 @@
 import { db } from "../db/connection";
-import { count, eq } from "drizzle-orm";
+import { count, eq, asc } from "drizzle-orm";
 import { productBatchesTable, productItemsTable } from "../db/schema";
 import { ProductBatchRequest, ProductItemRequest } from "../types/batch.types";
 import { generateProductBatchItemQueue, updateBatchStatusQueue } from "../taks/queues/generate-product-batch-item-queue";
@@ -7,7 +7,7 @@ import QRCode from 'qrcode'
 import { Jimp } from "jimp";
 
 export class BatchService {
-  static async getBatches(params: { productId?: number, page?: number, limit?: number }) {
+  static async getBatches(params: { productId?: string, page?: number, limit?: number }) {
     const page = params?.page || 1;
     const limit = params?.limit || 10;
     const offset = (page - 1) * limit;
@@ -57,7 +57,7 @@ export class BatchService {
   }
   
 
-  static async getBatchItems(batchId: number, params: { page?: number, limit?: number }) {
+  static async getBatchItems(batchId: string, params: { page?: number, limit?: number }) {
     const page = params?.page || 1;
     const limit = params?.limit || 10;
     const offset = (page - 1) * limit;
@@ -72,6 +72,7 @@ export class BatchService {
       .from(productItemsTable)
       .where(eq(productItemsTable.batchId, batchId))
       .limit(limit)
+      .orderBy(asc(productItemsTable.itemOrder))
       .offset(offset);
 
     const itemsWithQrCode = await Promise.all(items.map(async (item) => {
@@ -104,17 +105,17 @@ export class BatchService {
     return batch[0];
   }
 
-  static async updateProductBatch(batchId: number, data: ProductBatchRequest) {
+  static async updateProductBatch(batchId: string, data: ProductBatchRequest) {
     const batch = await db.update(productBatchesTable).set(data).where(eq(productBatchesTable.id, batchId));
     return batch;
   }
 
-  static async deleteProductBatch(batchId: number) {
+  static async deleteProductBatch(batchId: string) {
     const batch = await db.delete(productBatchesTable).where(eq(productBatchesTable.id, batchId));
     return batch;
   }
 
-  static async getProductBatchById(batchId: number) {
+  static async getProductBatchById(batchId: string) {
     const batch = await db.select().from(productBatchesTable).where(eq(productBatchesTable.id, batchId));
     return batch;
   }
@@ -131,7 +132,7 @@ export class BatchService {
    * @param options - Configuration options for job processing
    */
   static async createProductItemsAsync(
-    batchId: number, 
+    batchId: string, 
     quantity: number,
     options: {
       batchSize?: number;
@@ -217,7 +218,7 @@ export class BatchService {
   /**
    * Set up job completion tracking to update batch status when all jobs are done
    */
-  private static async setupJobCompletionTracking(batchId: number, totalJobs: number) {
+  private static async setupJobCompletionTracking(batchId: string, totalJobs: number) {
     // This could be enhanced with a separate tracking mechanism
     // For now, we'll rely on individual job completion handlers
     console.log(`Set up tracking for ${totalJobs} jobs for batch ${batchId}`);
@@ -227,20 +228,53 @@ export class BatchService {
   }
 
   /**
-   * Get job progress for a batch
+   * Get job progress for a batch including actual inserted items count
    */
-  static async getBatchJobProgress(batchId: number) {
+  static async getBatchJobProgress(batchId: string) {
     try {
-      // Get all jobs for this batch
-      const jobs = await generateProductBatchItemQueue.getJobs(['waiting', 'active', 'completed', 'failed']);
-      const batchJobs = jobs.filter(job => job.data.batchId === batchId);
+      // Get batch info to know the total quantity
+      const batch = await db.select()
+        .from(productBatchesTable)
+        .where(eq(productBatchesTable.id, batchId))
+        .limit(1);
+
+      if (batch.length === 0) {
+        return null;
+      }
+
+      // Get actual count of inserted product items
+      const [{ totalInserted }] = await db
+        .select({ totalInserted: count() })
+        .from(productItemsTable)
+        .where(eq(productItemsTable.batchId, batchId));
+
+      // Get jobs by status for this batch
+      const [waitingJobs, activeJobs, completedJobs, failedJobs] = await Promise.all([
+        generateProductBatchItemQueue.getJobs(['waiting']),
+        generateProductBatchItemQueue.getJobs(['active']),
+        generateProductBatchItemQueue.getJobs(['completed']),
+        generateProductBatchItemQueue.getJobs(['failed'])
+      ]);
+
+      // Filter jobs by batchId
+      const batchWaitingJobs = waitingJobs.filter(job => job.data.batchId === batchId);
+      const batchActiveJobs = activeJobs.filter(job => job.data.batchId === batchId);
+      const batchCompletedJobs = completedJobs.filter(job => job.data.batchId === batchId);
+      const batchFailedJobs = failedJobs.filter(job => job.data.batchId === batchId);
 
       const stats = {
-        total: batchJobs.length,
-        waiting: batchJobs.filter(job => job.opts.jobId?.includes('waiting')).length,
-        active: batchJobs.filter(job => job.opts.jobId?.includes('active')).length,
-        completed: batchJobs.filter(job => job.opts.jobId?.includes('completed')).length,
-        failed: batchJobs.filter(job => job.opts.jobId?.includes('failed')).length,
+        // Job progress
+        totalJobs: batchWaitingJobs.length + batchActiveJobs.length + batchCompletedJobs.length + batchFailedJobs.length,
+        waiting: batchWaitingJobs.length,
+        active: batchActiveJobs.length,
+        completed: batchCompletedJobs.length,
+        failed: batchFailedJobs.length,
+        
+        // Item insertion progress
+        totalInsert: totalInserted,
+        qty: batch[0].quantity,
+        progressPercentage: Math.round((totalInserted / batch[0].quantity) * 100),
+        isCompleted: totalInserted >= batch[0].quantity
       };
 
       return stats;
