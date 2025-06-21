@@ -76,7 +76,7 @@ export class BatchService {
       .offset(offset);
 
     const itemsWithQrCode = await Promise.all(items.map(async (item) => {
-      const qrString = `http://192.168.0.106:5173/scan?qrCode=${item.qrCode}`
+      const qrString = `${process.env.SCAN_BASE_URL}/scan?qrCode=${item.qrCode}`
       const qrCodeBase64 = WITH_WATERMARK ? await this.addWatermarkToQrCode(qrString) : await QRCode.toDataURL(qrString);
       return {
         ...item,
