@@ -8,6 +8,13 @@
       "when": 1750203467561,
       "tag": "0000_strong_random",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1750213403042,
+      "tag": "0001_freezing_zodiak",
+      "breakpoints": true
     }
   ]
 }

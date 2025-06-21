@@ -1,0 +1,1 @@
+ALTER TABLE `product_batches` ADD `batch_link_download` varchar(500);

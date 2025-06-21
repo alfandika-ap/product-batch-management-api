@@ -3,6 +3,7 @@ import { BatchService } from "../services/batch.service";
 import { ResponseUtil } from "../utils/response.util";
 import { ProductBatchRequest } from "../types/batch.types";
 import { generateSerialNumber, getLastSequenceNumber } from "../taks/workers/generate-product-batch-item.worker";
+import { CryptoUtil } from "../utils/crypto.util";
 
 export class BatchController {
   static async getBatches(context: Context) {
@@ -147,6 +148,126 @@ export class BatchController {
       }
       console.error('Error deleting batch:', error);
       return ResponseUtil.error('Failed to delete batch', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  static async getBatchJobProgress(context: Context) {
+    try {
+      const batchId = context.params.id;
+      const progress = await BatchService.getBatchJobProgress(batchId);
+      if (!progress) {
+        return ResponseUtil.error('Batch not found', 'The specified batch does not exist');
+      }
+      return ResponseUtil.success(progress, 'Batch progress retrieved successfully');
+    } catch (error) {
+      console.error('Error fetching batch progress:', error);
+      return ResponseUtil.error('Failed to retrieve batch progress', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  static async downloadBatch(context: Context) {
+    try {
+      const batchId = context.params.id;
+      
+      // Get batch info
+      const batch = await BatchService.getProductBatchById(batchId);
+      if (!batch || batch.length === 0) {
+        context.set.status = 404;
+        return ResponseUtil.error('Batch not found', 'The specified batch does not exist');
+      }
+
+      const batchData = batch[0];
+      
+      // Check if batch generation is completed
+      if (batchData.generateProductItemsStatus !== 'completed') {
+        context.set.status = 400;
+        return ResponseUtil.error('Batch not ready', 'Batch QR codes are still being generated');
+      }
+
+      // Check if download link exists
+      if (!batchData.batchLinkDownload) {
+        context.set.status = 404;
+        return ResponseUtil.error('Download not available', 'No download link available for this batch');
+      }
+
+      const zipFileName = `batch-${batchId}-qrcodes.zip`;
+      const zipFilePath = `./downloads/${zipFileName}`;
+      
+      // Check if file exists
+      const fs = await import('fs');
+      if (!fs.existsSync(zipFilePath)) {
+        context.set.status = 404;
+        return ResponseUtil.error('File not found', 'The zip file is no longer available');
+      }
+
+      // Generate public download URL with encrypted token
+      const baseUrl = context.request.url.split('/api')[0]; // Get base URL from request
+      const downloadUrl = `${baseUrl}/api/v1/downloads/${zipFileName}`;
+      const encryptedToken = CryptoUtil.encrypt(downloadUrl);
+      const publicUrl = `${downloadUrl}?token=${encodeURIComponent(encryptedToken)}`;
+      
+      return ResponseUtil.success({
+        downloadUrl: publicUrl,
+        expiresIn: '24 hours',
+        instructions: 'Use this public URL to download the file. The URL will expire after 24 hours.'
+      }, 'Public download URL generated successfully');
+      
+    } catch (error) {
+      console.error('Error generating download URL:', error);
+      context.set.status = 500;
+      return ResponseUtil.error('Failed to generate download URL', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  static async downloadFile(context: Context) {
+    try {
+      const filename = context.params.filename;
+      const token = context.query.token;
+      
+      if (!token) {
+        context.set.status = 400;
+        return ResponseUtil.error('Token required', 'Download token is required');
+      }
+
+      // Decrypt the token to get the original URL
+      let decryptedUrl: string;
+      try {
+        decryptedUrl = CryptoUtil.decrypt(token);
+      } catch (error) {
+        context.set.status = 400;
+        return ResponseUtil.error('Invalid token', 'The download token is invalid or expired');
+      }
+
+      // Verify the URL matches the expected pattern
+      const baseUrl = context.request.url.split('/api')[0];
+      const expectedUrl = `${baseUrl}/api/v1/downloads/${filename}`;
+      if (decryptedUrl !== expectedUrl) {
+        context.set.status = 400;
+        return ResponseUtil.error('Invalid token', 'The download token is invalid for this file');
+      }
+
+      const zipFilePath = `./downloads/${filename}`;
+      
+      // Check if file exists
+      const fs = await import('fs');
+      if (!fs.existsSync(zipFilePath)) {
+        context.set.status = 404;
+        return ResponseUtil.error('File not found', 'The requested file is no longer available');
+      }
+
+      // Set response headers for file download
+      context.set.headers['Content-Type'] = 'application/zip';
+      context.set.headers['Content-Disposition'] = `attachment; filename="${filename}"`;
+
+      // Read and return file
+      const fileBuffer = fs.readFileSync(zipFilePath);
+      
+      return fileBuffer;
+      
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      context.set.status = 500;
+      return ResponseUtil.error('Download failed', error instanceof Error ? error.message : 'Unknown error');
     }
   }
 }

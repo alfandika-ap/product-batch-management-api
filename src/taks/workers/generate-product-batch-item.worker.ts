@@ -1,7 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { db } from '../../db/connection';
 import { productItemsTable, productBatchesTable } from '../../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, count } from 'drizzle-orm';
 import { redisConnection } from '../queues/connection';
 import { updateBatchStatusQueue } from '../queues/generate-product-batch-item-queue';
 import {
@@ -9,6 +9,14 @@ import {
   GenerateProductBatchItemJobData,
   JobProgressData
 } from '../jobs/generate-product-batch-item.job';
+import QRCode from 'qrcode';
+import { Jimp } from "jimp";
+import * as fs from 'fs';
+import * as path from 'path';
+import archiver from 'archiver';
+import { promisify } from 'util';
+
+const mkdir = promisify(fs.mkdir);
 
 /**
  * Generate unique QR code for product item
@@ -17,6 +25,29 @@ function generateQRCode(batchId: string, index: number, prefix?: string): string
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
   return prefix ? `${prefix}-${batchId}-${index}-${timestamp}-${random}` : `QR-${batchId}-${index}-${timestamp}-${random}`;
+}
+
+/**
+ * Add watermark to QR code like in getBatchItems
+ */
+async function addWatermarkToQrCode(qrCode: string): Promise<string> {
+  const qrBuffer = await QRCode.toBuffer(qrCode, {
+    width: 300,
+    errorCorrectionLevel: 'H'
+  });
+
+  const qrImage = await Jimp.read(qrBuffer);
+  const logo = await Jimp.read('./src/assets/images/carabo-qr-watermark.png');
+
+  const logoSize = qrImage.bitmap.width * 0.2;
+  logo.resize({w: logoSize, h: logoSize});
+
+  const x = (qrImage.bitmap.width / 2) - (logo.bitmap.width / 2);
+  const y = (qrImage.bitmap.height / 2) - (logo.bitmap.height / 2);
+
+  qrImage.composite(logo, x, y);
+
+  return await qrImage.getBase64("image/png");
 }
 
 /**
@@ -78,12 +109,130 @@ async function createProductItemsBatch(
 }
 
 /**
+ * Check if this is the last job for the batch and create zip if so
+ */
+async function checkAndCreateZipIfLastJob(batchId: string, totalQuantity: number): Promise<void> {
+  // Get actual count of inserted product items
+  const [{ totalInserted }] = await db
+    .select({ totalInserted: count() })
+    .from(productItemsTable)
+    .where(eq(productItemsTable.batchId, batchId));
+
+  // Check if all items are created
+  if (totalInserted >= totalQuantity) {
+    console.log(`All ${totalInserted} items created for batch ${batchId}. Starting zip creation...`);
+    
+    // Create zip file using streaming approach
+    await createZipFileStreaming(batchId, totalInserted);
+    
+    console.log(`Batch ${batchId} completed with zip file created`);
+  }
+}
+
+/**
+ * Create zip file using streaming approach for large batches
+ */
+async function createZipFileStreaming(batchId: string, totalQuantity: number): Promise<void> {
+  const outputDir = './downloads';
+  await mkdir(outputDir, { recursive: true });
+  
+  const zipFileName = `batch-${batchId}-qrcodes.zip`;
+  const zipFilePath = path.join(outputDir, zipFileName);
+  
+  return new Promise(async (resolve, reject) => {
+    try {
+      const output = fs.createWriteStream(zipFilePath);
+      const archive = archiver('zip', { 
+        zlib: { level: 6 }, // Balanced compression (faster than level 9)
+        forceLocalTime: true
+      });
+      
+      output.on('close', async () => {
+        console.log(`Zip file created: ${zipFilePath} (${archive.pointer()} total bytes)`);
+        
+        // Update batch with download link and completed status
+        const downloadLink = `/batches/${batchId}/download`;
+        await db
+          .update(productBatchesTable)
+          .set({ 
+            generateProductItemsStatus: 'completed',
+            batchLinkDownload: downloadLink
+          })
+          .where(eq(productBatchesTable.id, batchId));
+          
+        resolve();
+      });
+      
+      archive.on('error', (err: Error) => {
+        console.error(`Archive error for batch ${batchId}:`, err);
+        reject(err);
+      });
+      
+      archive.pipe(output);
+      
+      // Process items in chunks to avoid memory issues
+      const chunkSize = 50; // Process 50 QR codes at a time for better memory management
+      const totalChunks = Math.ceil(totalQuantity / chunkSize);
+      
+      console.log(`Processing ${totalQuantity} QR codes in ${totalChunks} chunks of ${chunkSize}`);
+      
+      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const offset = chunkIndex * chunkSize;
+        const limit = Math.min(chunkSize, totalQuantity - offset);
+        
+        // Get items for this chunk
+        const chunkItems = await db.select()
+          .from(productItemsTable)
+          .where(eq(productItemsTable.batchId, batchId))
+          .limit(limit)
+          .offset(offset);
+        
+        // Process chunk items
+        for (const item of chunkItems) {
+          try {
+            const qrString = `${process.env.SCAN_BASE_URL}/scan?qrCode=${item.qrCode}`;
+            const qrCodeBase64 = await addWatermarkToQrCode(qrString);
+            
+            // Convert base64 to buffer
+            const base64Data = qrCodeBase64.replace(/^data:image\/png;base64,/, '');
+            const buffer = Buffer.from(base64Data, 'base64');
+            
+            // Add directly to archive without saving to disk
+            archive.append(buffer, { name: `${item.serialNumber}.png` });
+            
+          } catch (error) {
+            console.error(`Error processing QR code for item ${item.serialNumber}:`, error);
+            // Continue with next item instead of failing entire batch
+          }
+        }
+        
+        // Log progress
+        const processed = Math.min((chunkIndex + 1) * chunkSize, totalQuantity);
+        console.log(`Zip Progress: ${processed}/${totalQuantity} QR codes processed for batch ${batchId}`);
+        
+        // Small delay to prevent overwhelming the system
+        if (chunkIndex < totalChunks - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100)); // Slightly longer delay for QR generation
+        }
+      }
+      
+      // Finalize the archive
+      await archive.finalize();
+      
+    } catch (error) {
+      console.error(`Error creating zip file for batch ${batchId}:`, error);
+      reject(error);
+    }
+  });
+}
+
+/**
  * Worker for processing product batch item generation jobs
  */
 export const generateProductBatchItemWorker = new Worker(
   GENERATE_PRODUCT_BATCH_ITEM_JOB,
   async (job: Job<GenerateProductBatchItemJobData>) => {
-    const { batchId, batchSize, startIndex, endIndex, qrCodePrefix } = job.data;
+    const { batchId, batchSize, startIndex, endIndex, qrCodePrefix, totalQuantity } = job.data;
     
     try {
       // Update job progress
@@ -113,7 +262,7 @@ export const generateProductBatchItemWorker = new Worker(
             currentEnd,
             qrCodePrefix
           );
-          
+
           processed += itemsCreated;
           
           // Update progress
@@ -135,14 +284,11 @@ export const generateProductBatchItemWorker = new Worker(
         }
       }
 
-      await db
-        .update(productBatchesTable)
-        .set({ 
-          generateProductItemsStatus: 'completed'
-        })
-        .where(eq(productBatchesTable.id, batchId));
-
       console.log(`Successfully generated ${processed} product items for batch ${batchId}`);
+      
+      // Check if this is the last job and create zip if so
+      await checkAndCreateZipIfLastJob(batchId, totalQuantity);
+      
       return { processed, batchId, success: true };
       
     } catch (error) {

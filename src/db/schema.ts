@@ -30,6 +30,7 @@ export const productBatchesTable = mysqlTable('product_batches', {
     }),
   batchCode: varchar('batch_code', { length: 100 }).notNull().unique(),
   quantity: int().notNull(),
+  batchLinkDownload: varchar('batch_link_download', { length: 500 }),
   createdAt: timestamp('created_at').defaultNow(),
   generateProductItemsStatus: mysqlEnum('generate_product_items_status', ['pending', 'completed', 'failed']).default('pending'),
 }, (table) => ({

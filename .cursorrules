@@ -128,6 +128,8 @@ src/
 - Use middleware for common functionality
 - Implement proper CORS configuration
 - Add request/response logging for debugging
+- DONT ADD MD FILES
+- JANGAN EXPLORE ATAU TAMBAHKAN HAL LAIN, FOKUS JAWAB AJA YANG DI TANYAKAN
 
 ## Special Considerations
 

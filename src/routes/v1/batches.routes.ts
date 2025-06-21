@@ -307,6 +307,52 @@ export const batchesRoutes = new Elysia({ prefix: "/batches" })
     }
   )
 
+  // Download batch (get encrypted URL)
+  .post("/:id/download", BatchController.downloadBatch, {
+    params: t.Object({
+      id: t.String(),
+    }),
+    detail: {
+      summary: "Get encrypted download URL for batch",
+      description: "Get an encrypted download URL for batch QR codes (Admin only)",
+      tags: ["Batches"],
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: {
+          description: "Download URL generated successfully",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  success: { type: "boolean" },
+                  message: { type: "string" },
+                  data: {
+                    type: "object",
+                    properties: {
+                      downloadUrl: { type: "string" },
+                      expiresIn: { type: "string" },
+                      instructions: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        400: {
+          description: "Batch not ready",
+        },
+        404: {
+          description: "Batch not found or download not available",
+        },
+        401: {
+          description: "Unauthorized",
+        },
+      },
+    },
+  })
+
   // Update batch
   .put(
     "/:id",
