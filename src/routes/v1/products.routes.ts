@@ -121,7 +121,7 @@ export const productsRoutes = new Elysia({ prefix: '/products' })
     body: t.Object({
       name: t.String({ minLength: 1, maxLength: 255 }),
       category: t.String({ minLength: 1, maxLength: 100 }),
-      image_url: t.Optional(t.String()),
+      imageUrl: t.Optional(t.String()),
       description: t.Optional(t.String())
     }),
     detail: {
@@ -139,7 +139,7 @@ export const productsRoutes = new Elysia({ prefix: '/products' })
               properties: {
                 name: { type: 'string', minLength: 1, maxLength: 255 },
                 category: { type: 'string', minLength: 1, maxLength: 100 },
-                image_url: { type: 'string' },
+                imageUrl: { type: 'string' },
                 description: { type: 'string' }
               }
             }
@@ -167,7 +167,7 @@ export const productsRoutes = new Elysia({ prefix: '/products' })
     body: t.Object({
       name: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
       category: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
-      image_url: t.Optional(t.String()),
+      imageUrl: t.Optional(t.String()),
       description: t.Optional(t.String())
     }),
     detail: {
