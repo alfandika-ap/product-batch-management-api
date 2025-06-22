@@ -211,3 +211,26 @@ Sistem ini dapat handle:
 3. **Resources**: Monitor memory usage workers
 4. **Backup**: Regular backup Redis data
 5. **Health Checks**: Implement worker health monitoring
+
+## Recent Improvements
+
+### Enhanced Error Handling (Latest)
+
+- **Chunk-level Retry**: Individual chunks are retried independently
+- **Better Error Messages**: More descriptive error messages with context
+- **Graceful Degradation**: Failed chunks don't stop entire job
+- **Detailed Logging**: Comprehensive logging for debugging
+
+### Manual Retry System
+
+- **API Endpoint**: Manual retry of failed jobs
+- **Job Recreation**: Failed jobs are recreated with fresh retry count
+- **Status Updates**: Batch status is updated when jobs are retried
+- **Detailed Reporting**: Comprehensive retry results and statistics
+
+### Improved Monitoring
+
+- **Failed Jobs Details**: Detailed information about failed jobs
+- **Progress Tracking**: Real-time progress updates
+- **Error Context**: Detailed error information with job context
+- **Status Tracking**: Comprehensive batch status tracking

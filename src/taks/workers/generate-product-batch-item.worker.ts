@@ -87,25 +87,65 @@ async function createProductItemsBatch(
   endIndex: number,
   qrCodePrefix?: string
 ): Promise<number> {
-  const items = [];
-  const batch = await db.select().from(productBatchesTable).where(eq(productBatchesTable.id, batchId)).limit(1);
-  
-  // Get the last sequence number once at the start
-  const lastSequence = await getLastSequenceNumber(batchId);
-  
-  for (let i = startIndex; i <= endIndex; i++) {
-    items.push({
-      batchId,
-      qrCode: generateQRCode(batchId, i, qrCodePrefix),
-      serialNumber: generateSerialNumber(batch[0].batchCode, i, lastSequence),
-      itemOrder: i + 1,
-    });
-  }
+  try {
+    // Validate batch exists first
+    const batch = await db.select().from(productBatchesTable).where(eq(productBatchesTable.id, batchId)).limit(1);
+    
+    if (batch.length === 0) {
+      throw new Error(`Batch ${batchId} not found`);
+    }
 
-  // Use bulk insert for better performance
-  await db.insert(productItemsTable).values(items);
-  
-  return items.length;
+    // Check if batch is still in pending status
+    if (batch[0].generateProductItemsStatus === 'failed') {
+      throw new Error(`Batch ${batchId} is in failed status and cannot be processed`);
+    }
+
+    const items = [];
+    
+    // Get the last sequence number once at the start
+    const lastSequence = await getLastSequenceNumber(batchId);
+    
+    // Validate indices
+    if (startIndex < 0 || endIndex < startIndex) {
+      throw new Error(`Invalid indices: startIndex=${startIndex}, endIndex=${endIndex}`);
+    }
+    
+    for (let i = startIndex; i <= endIndex; i++) {
+      try {
+        const qrCode = generateQRCode(batchId, i, qrCodePrefix);
+        const serialNumber = generateSerialNumber(batch[0].batchCode, i, lastSequence);
+        
+        // Validate generated data
+        if (!qrCode || !serialNumber) {
+          throw new Error(`Failed to generate QR code or serial number for index ${i}`);
+        }
+        
+        items.push({
+          batchId,
+          qrCode,
+          serialNumber,
+          itemOrder: i + 1,
+        });
+      } catch (error) {
+        console.error(`Error generating item data for index ${i}:`, error);
+        throw new Error(`Failed to generate item data for index ${i}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    if (items.length === 0) {
+      throw new Error('No items to insert');
+    }
+
+    // Use bulk insert for better performance
+    await db.insert(productItemsTable).values(items);
+    
+    console.log(`Successfully inserted ${items.length} items for batch ${batchId} (indices ${startIndex}-${endIndex})`);
+    return items.length;
+    
+  } catch (error) {
+    console.error(`Error in createProductItemsBatch for batch ${batchId}, indices ${startIndex}-${endIndex}:`, error);
+    throw error; // Re-throw to allow retry logic to handle it
+  }
 }
 
 /**
@@ -251,36 +291,56 @@ export const generateProductBatchItemWorker = new Worker(
       // Process items in smaller chunks for better memory management
       const chunkSize = Math.min(batchSize, 50); // Process max 50 items at once
       let processed = 0;
+      let retryCount = 0;
+      const maxRetries = 3;
       
       for (let currentStart = startIndex; currentStart <= endIndex; currentStart += chunkSize) {
         const currentEnd = Math.min(currentStart + chunkSize - 1, endIndex);
         
-        try {
-          const itemsCreated = await createProductItemsBatch(
-            batchId,
-            currentStart,
-            currentEnd,
-            qrCodePrefix
-          );
+        let chunkSuccess = false;
+        let chunkRetries = 0;
+        
+        // Retry logic for each chunk
+        while (!chunkSuccess && chunkRetries < maxRetries) {
+          try {
+            const itemsCreated = await createProductItemsBatch(
+              batchId,
+              currentStart,
+              currentEnd,
+              qrCodePrefix
+            );
 
-          processed += itemsCreated;
-          
-          // Update progress
-          progressData.processed = processed;
-          progressData.currentBatch = Math.ceil(processed / chunkSize);
-          await job.updateProgress(progressData);
-          
-          console.log(`Processed ${processed}/${progressData.total} items for batch ${batchId}`);
-          
-          // Small delay to prevent overwhelming the database
-          if (currentEnd < endIndex) {
-            await new Promise(resolve => setTimeout(resolve, 10));
+            processed += itemsCreated;
+            chunkSuccess = true;
+            
+            // Update progress
+            progressData.processed = processed;
+            progressData.currentBatch = Math.ceil(processed / chunkSize);
+            await job.updateProgress(progressData);
+            
+            console.log(`Processed ${processed}/${progressData.total} items for batch ${batchId}`);
+            
+            // Small delay to prevent overwhelming the database
+            if (currentEnd < endIndex) {
+              await new Promise(resolve => setTimeout(resolve, 10));
+            }
+          } catch (error) {
+            chunkRetries++;
+            const errorMsg = `Error processing items ${currentStart}-${currentEnd} (attempt ${chunkRetries}/${maxRetries}): ${error instanceof Error ? error.message : 'Unknown error'}`;
+            progressData.errors.push(errorMsg);
+            console.error(errorMsg);
+            
+            if (chunkRetries >= maxRetries) {
+              // If all retries failed for this chunk, log but continue with next chunk
+              console.error(`Failed to process chunk ${currentStart}-${currentEnd} after ${maxRetries} attempts, continuing with next chunk`);
+              // Don't throw error here, just continue to next chunk
+            } else {
+              // Wait before retry with exponential backoff
+              const delay = Math.pow(2, chunkRetries) * 1000; // 2s, 4s, 8s
+              console.log(`Retrying chunk ${currentStart}-${currentEnd} in ${delay}ms`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
           }
-        } catch (error) {
-          const errorMsg = `Error processing items ${currentStart}-${currentEnd}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-          progressData.errors.push(errorMsg);
-          console.error(errorMsg);
-          throw error; // Re-throw to trigger job retry
         }
       }
 
@@ -317,16 +377,53 @@ export const generateProductBatchItemWorker = new Worker(
 // Worker event handlers
 generateProductBatchItemWorker.on('completed', async (job) => {
   console.log(`Job ${job.id} completed successfully for batch ${job.data.batchId}`);
+  
+  // Log completion details
+  const result = job.returnvalue;
+  if (result && result.processed) {
+    console.log(`Job ${job.id} processed ${result.processed} items for batch ${job.data.batchId}`);
+  }
 });
 
-generateProductBatchItemWorker.on('failed', (job, err) => {
+generateProductBatchItemWorker.on('failed', async (job, err) => {
   console.error(`Job ${job?.id} failed for batch ${job?.data.batchId}:`, err);
+  
+  if (job) {
+    // Log detailed failure information
+    console.error(`Job failure details:`, {
+      jobId: job.id,
+      batchId: job.data.batchId,
+      startIndex: job.data.startIndex,
+      endIndex: job.data.endIndex,
+      attempts: job.attemptsMade,
+      maxAttempts: job.opts.attempts,
+      error: err.message,
+      stack: err.stack
+    });
+    
+    // Check if this was the final attempt
+    if (job.attemptsMade >= (job.opts.attempts || 3)) {
+      console.error(`Job ${job.id} has exhausted all retry attempts for batch ${job.data.batchId}`);
+      
+      // Update batch status to failed if this was the final attempt
+      try {
+        await updateBatchStatusQueue.add('update-batch-status', {
+          batchId: job.data.batchId,
+          status: 'failed',
+          error: `Job ${job.id} failed after ${job.attemptsMade} attempts: ${err.message}`
+        });
+        console.log(`Added batch status update job for failed batch ${job.data.batchId}`);
+      } catch (updateError) {
+        console.error(`Failed to add batch status update job for batch ${job.data.batchId}:`, updateError);
+      }
+    }
+  }
 });
 
 generateProductBatchItemWorker.on('error', (err) => {
   console.error('Worker error:', err);
 });
 
-console.log('Generate Product Batch Item Worker started');
+console.log('Generate Product Batch Item Worker started with improved error handling and retry mechanisms');
 
 export default generateProductBatchItemWorker; 

@@ -119,8 +119,22 @@ export class BatchController {
   static async deleteBatch(context: Context) {
     try {
       const batchId = context.params.id;
-      const batch = await BatchService.deleteProductBatch(batchId);
-      return ResponseUtil.success(batch, 'Batch deleted successfully');
+      const batchDetails = await BatchService.getProductBatchById(batchId);
+      const batchDeleted = await BatchService.deleteProductBatch(batchId);
+      
+      if (batchDetails.length) {
+        const item = batchDetails[0];
+        if (item.batchLinkDownload) {
+          const fs = await import('fs');
+          const zipFileName = `batch-${batchId}-qrcodes.zip`;
+          const zipFilePath = `./downloads/${zipFileName}`;
+          if (fs.existsSync(zipFilePath)) {
+            fs.unlinkSync(zipFilePath);
+          }
+        }
+      }
+      
+      return ResponseUtil.success(batchDeleted, 'Batch deleted successfully');
     } catch (error) {
       if (error instanceof Error) {
         // Log detailed error information
@@ -155,13 +169,47 @@ export class BatchController {
     try {
       const batchId = context.params.id;
       const progress = await BatchService.getBatchJobProgress(batchId);
+      
       if (!progress) {
-        return ResponseUtil.error('Batch not found', 'The specified batch does not exist');
+        return ResponseUtil.error('Progress information not available', 'Unable to retrieve progress');
       }
+      
       return ResponseUtil.success(progress, 'Batch progress retrieved successfully');
     } catch (error) {
       console.error('Error fetching batch progress:', error);
       return ResponseUtil.error('Failed to retrieve batch progress', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  static async retryFailedJobs(context: Context) {
+    try {
+      const batchId = context.params.id;
+      const result = await BatchService.retryFailedJobs(batchId);
+      
+      if (!result.success) {
+        return ResponseUtil.error('Failed to retry jobs', result.message || 'Unable to retry failed jobs');
+      }
+      
+      return ResponseUtil.success(result, 'Failed jobs retried successfully');
+    } catch (error) {
+      console.error('Error retrying failed jobs:', error);
+      return ResponseUtil.error('Failed to retry jobs', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  static async getFailedJobsDetails(context: Context) {
+    try {
+      const batchId = context.params.id;
+      const details = await BatchService.getFailedJobsDetails(batchId);
+      
+      if (!details) {
+        return ResponseUtil.error('Failed jobs details not available', 'Unable to retrieve failed jobs details');
+      }
+      
+      return ResponseUtil.success(details, 'Failed jobs details retrieved successfully');
+    } catch (error) {
+      console.error('Error fetching failed jobs details:', error);
+      return ResponseUtil.error('Failed to retrieve failed jobs details', error instanceof Error ? error.message : 'Unknown error');
     }
   }
 

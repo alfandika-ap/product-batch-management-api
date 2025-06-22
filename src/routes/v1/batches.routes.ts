@@ -219,6 +219,102 @@ export const batchesRoutes = new Elysia({ prefix: "/batches" })
     },
   })
 
+  // Retry failed jobs for batch
+  .post("/:id/retry-failed-jobs", BatchController.retryFailedJobs, {
+    params: t.Object({
+      id: t.String(),
+    }),
+    detail: {
+      summary: "Retry failed jobs for batch",
+      description: "Retry all failed jobs for a specific batch",
+      tags: ["Batches"],
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: {
+          description: "Failed jobs retried successfully",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  success: { type: "boolean" },
+                  message: { type: "string" },
+                  data: {
+                    type: "object",
+                    properties: {
+                      retriedJobs: { type: "number" },
+                      failedRetries: { type: "number" },
+                      details: { 
+                        type: "array",
+                        items: { type: "object" }
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        400: {
+          description: "No failed jobs found or retry failed",
+        },
+        404: {
+          description: "Batch not found",
+        },
+        401: {
+          description: "Unauthorized",
+        },
+      },
+    },
+  })
+
+  // Get failed jobs details for batch
+  .get("/:id/failed-jobs", BatchController.getFailedJobsDetails, {
+    params: t.Object({
+      id: t.String(),
+    }),
+    detail: {
+      summary: "Get failed jobs details for batch",
+      description: "Get detailed information about failed jobs for a specific batch",
+      tags: ["Batches"],
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: {
+          description: "Failed jobs details retrieved successfully",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  success: { type: "boolean" },
+                  message: { type: "string" },
+                  data: {
+                    type: "object",
+                    properties: {
+                      batchId: { type: "string" },
+                      failedJobsCount: { type: "number" },
+                      failedJobs: { 
+                        type: "array",
+                        items: { type: "object" }
+                      },
+                      batchInfo: { type: "object" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        404: {
+          description: "Batch not found or no failed jobs",
+        },
+        401: {
+          description: "Unauthorized",
+        },
+      },
+    },
+  })
+
   // Create new batch
   .post("/", BatchController.createBatch, {
     body: t.Object({

@@ -283,4 +283,152 @@ export class BatchService {
       return null;
     }
   }
+
+  /**
+   * Retry failed jobs for a specific batch
+   */
+  static async retryFailedJobs(batchId: string) {
+    try {
+      // Get batch info to verify it exists
+      const batch = await db.select()
+        .from(productBatchesTable)
+        .where(eq(productBatchesTable.id, batchId))
+        .limit(1);
+
+      if (batch.length === 0) {
+        return {
+          success: false,
+          message: 'Batch not found'
+        };
+      }
+
+      // Get failed jobs for this batch
+      const failedJobs = await generateProductBatchItemQueue.getJobs(['failed']);
+      const batchFailedJobs = failedJobs.filter(job => job.data.batchId === batchId);
+
+      if (batchFailedJobs.length === 0) {
+        return {
+          success: true,
+          message: 'No failed jobs found for this batch',
+          retriedJobs: 0
+        };
+      }
+
+      console.log(`Retrying ${batchFailedJobs.length} failed jobs for batch ${batchId}`);
+
+      // Retry each failed job
+      const retryPromises = batchFailedJobs.map(async (job) => {
+        try {
+          // Remove the failed job and create a new one with the same data
+          await job.remove();
+          
+          // Create new job with same data but fresh retry count
+          const newJob = await generateProductBatchItemQueue.add(
+            'generate-product-batch-items',
+            job.data,
+            {
+              priority: job.opts.priority || 0,
+              jobId: `retry-${job.id}`, // New unique ID for retry
+              delay: 0, // No delay for retry
+            }
+          );
+          
+          console.log(`Retried job ${job.id} as ${newJob.id} for batch ${batchId}`);
+          return { originalJobId: job.id, newJobId: newJob.id, success: true };
+        } catch (error) {
+          console.error(`Failed to retry job ${job.id}:`, error);
+          return { originalJobId: job.id, success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
+      });
+
+      const retryResults = await Promise.all(retryPromises);
+      const successfulRetries = retryResults.filter(result => result.success).length;
+      const failedRetries = retryResults.filter(result => !result.success).length;
+
+      // Update batch status if we have retried jobs
+      if (successfulRetries > 0) {
+        await db
+          .update(productBatchesTable)
+          .set({ generateProductItemsStatus: 'pending' })
+          .where(eq(productBatchesTable.id, batchId));
+      }
+
+      return {
+        success: true,
+        message: `Retried ${successfulRetries} jobs successfully`,
+        retriedJobs: successfulRetries,
+        failedRetries,
+        details: retryResults
+      };
+
+    } catch (error) {
+      console.error(`Failed to retry jobs for batch ${batchId}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Get detailed information about failed jobs for a batch
+   */
+  static async getFailedJobsDetails(batchId: string) {
+    try {
+      // Get batch info to verify it exists
+      const batch = await db.select()
+        .from(productBatchesTable)
+        .where(eq(productBatchesTable.id, batchId))
+        .limit(1);
+
+      if (batch.length === 0) {
+        return null;
+      }
+
+      // Get failed jobs for this batch
+      const failedJobs = await generateProductBatchItemQueue.getJobs(['failed']);
+      const batchFailedJobs = failedJobs.filter(job => job.data.batchId === batchId);
+
+      if (batchFailedJobs.length === 0) {
+        return {
+          batchId,
+          failedJobsCount: 0,
+          failedJobs: [],
+          message: 'No failed jobs found for this batch'
+        };
+      }
+
+      // Get detailed information about each failed job
+      const failedJobsDetails = batchFailedJobs.map(job => ({
+        jobId: job.id,
+        batchId: job.data.batchId,
+        startIndex: job.data.startIndex,
+        endIndex: job.data.endIndex,
+        totalQuantity: job.data.totalQuantity,
+        batchSize: job.data.batchSize,
+        attemptsMade: job.attemptsMade,
+        maxAttempts: job.opts.attempts || 3,
+        failedAt: job.finishedOn,
+        error: job.failedReason,
+        progress: job.progress,
+        data: job.data
+      }));
+
+      return {
+        batchId,
+        failedJobsCount: batchFailedJobs.length,
+        failedJobs: failedJobsDetails,
+        batchInfo: {
+          id: batch[0].id,
+          batchCode: batch[0].batchCode,
+          quantity: batch[0].quantity,
+          status: batch[0].generateProductItemsStatus
+        }
+      };
+
+    } catch (error) {
+      console.error(`Failed to get failed jobs details for batch ${batchId}:`, error);
+      return null;
+    }
+  }
 }
