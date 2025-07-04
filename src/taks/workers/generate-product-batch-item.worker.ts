@@ -213,6 +213,7 @@ async function createZipFileStreaming(batchId: string, totalQuantity: number): P
       // Process items in chunks to avoid memory issues
       const chunkSize = 50; // Process 50 QR codes at a time for better memory management
       const totalChunks = Math.ceil(totalQuantity / chunkSize);
+      const WITH_WATERMARK = false;
       
       console.log(`Processing ${totalQuantity} QR codes in ${totalChunks} chunks of ${chunkSize}`);
       
@@ -231,7 +232,7 @@ async function createZipFileStreaming(batchId: string, totalQuantity: number): P
         for (const item of chunkItems) {
           try {
             const qrString = `${process.env.SCAN_BASE_URL}/scan?qrCode=${item.qrCode}`;
-            const qrCodeBase64 = await addWatermarkToQrCode(qrString);
+            const qrCodeBase64 = WITH_WATERMARK ? await addWatermarkToQrCode(qrString) : await QRCode.toDataURL(qrString);
             
             // Convert base64 to buffer
             const base64Data = qrCodeBase64.replace(/^data:image\/png;base64,/, '');
