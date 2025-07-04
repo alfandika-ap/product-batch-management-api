@@ -61,7 +61,7 @@ export class BatchService {
     const page = params?.page || 1;
     const limit = params?.limit || 10;
     const offset = (page - 1) * limit;
-    const WITH_WATERMARK = true;
+    const WITH_WATERMARK = false;
     
     const [{ totalCount }] = await db
       .select({ totalCount: count() })
