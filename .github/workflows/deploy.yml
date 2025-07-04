@@ -41,6 +41,7 @@ jobs:
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='.github' \
+            --exclude='downloads' \
             ./ $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/
 
       - name: Setup and Start Application
