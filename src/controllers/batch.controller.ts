@@ -249,7 +249,7 @@ export class BatchController {
       }
 
       // Generate public download URL with encrypted token
-      const baseUrl = "https://api-check.carabaopro.com/api/v1"; // Get base URL from request
+      const baseUrl = "https://api-check.carabaopro.com"; // Get base URL from request
       const downloadUrl = `${baseUrl}/api/v1/downloads/${zipFileName}`;
       const encryptedToken = CryptoUtil.encrypt(downloadUrl);
       const publicUrl = `${downloadUrl}?token=${encodeURIComponent(encryptedToken)}`;
@@ -287,7 +287,7 @@ export class BatchController {
       }
 
       // Verify the URL matches the expected pattern
-      const baseUrl = "https://api-check.carabaopro.com/api/v1";
+      const baseUrl = "https://api-check.carabaopro.com";
       const expectedUrl = `${baseUrl}/api/v1/downloads/${filename}`;
       if (decryptedUrl !== expectedUrl) {
         context.set.status = 400;
