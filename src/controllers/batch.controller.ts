@@ -287,7 +287,7 @@ export class BatchController {
       }
 
       // Verify the URL matches the expected pattern
-      const baseUrl = context.request.url.split('/api')[0];
+      const baseUrl = "https://api-check.carabaopro.com/api/v1";
       const expectedUrl = `${baseUrl}/api/v1/downloads/${filename}`;
       if (decryptedUrl !== expectedUrl) {
         context.set.status = 400;
