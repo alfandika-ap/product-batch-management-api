@@ -54,24 +54,68 @@ async function addWatermarkToQrCode(qrCode: string): Promise<string> {
  * Get the last sequence number from existing product items in a batch
  */
 export async function getLastSequenceNumber(batchId: string): Promise<number> {
-  const lastItem = await db
-    .select({ serialNumber: productItemsTable.serialNumber })
-    .from(productItemsTable)
-    .where(eq(productItemsTable.batchId, batchId))
-    .orderBy(desc(productItemsTable.serialNumber))
-    .limit(1);
+  try {
+    const lastItem = await db
+      .select({ serialNumber: productItemsTable.serialNumber })
+      .from(productItemsTable)
+      .where(eq(productItemsTable.batchId, batchId))
+      .orderBy(desc(productItemsTable.serialNumber))
+      .limit(1);
 
-  if (lastItem.length === 0) return 0;
+    if (lastItem.length === 0) return 0;
 
-  // Extract the sequence number from serialNumber (format: BATCH001-00000123)
-  const lastSerialNumber = lastItem[0].serialNumber;
-  const sequenceStr = lastSerialNumber.split('-')[1];
-  return parseInt(sequenceStr, 10);
+    // Extract the sequence number from serialNumber (format: BATCH001-00000123)
+    const lastSerialNumber = lastItem[0].serialNumber;
+    
+    // Validate serial number format
+    if (!lastSerialNumber || typeof lastSerialNumber !== 'string') {
+      console.warn(`Invalid serial number format for batch ${batchId}: ${lastSerialNumber}`);
+      return 0;
+    }
+    
+    const parts = lastSerialNumber.split('-');
+    if (parts.length < 2) {
+      console.warn(`Invalid serial number format for batch ${batchId}: ${lastSerialNumber}. Expected format: BATCH001-00000123`);
+      return 0;
+    }
+    
+    const sequenceStr = parts[1];
+    const sequence = parseInt(sequenceStr, 10);
+    
+    // Validate parsed sequence number
+    if (isNaN(sequence) || sequence < 0) {
+      console.warn(`Invalid sequence number parsed for batch ${batchId}: ${sequenceStr} -> ${sequence}`);
+      return 0;
+    }
+    
+    return sequence;
+  } catch (error) {
+    console.error(`Error getting last sequence number for batch ${batchId}:`, error);
+    return 0;
+  }
 }
 
 export function generateSerialNumber(batchCode: string, index: number, startFrom: number): string {
+  // Validate input parameters
+  if (!batchCode || typeof batchCode !== 'string') {
+    throw new Error(`Invalid batchCode: ${batchCode}`);
+  }
+  
+  if (isNaN(index) || index < 0) {
+    throw new Error(`Invalid index: ${index}. Must be a non-negative number.`);
+  }
+  
+  if (isNaN(startFrom) || startFrom < 0) {
+    throw new Error(`Invalid startFrom: ${startFrom}. Must be a non-negative number.`);
+  }
+  
   // Calculate new sequence by adding index to startFrom
   const newSequence = startFrom + index;
+  
+  // Additional validation for the calculated sequence
+  if (isNaN(newSequence) || newSequence < 0) {
+    throw new Error(`Invalid calculated sequence: ${newSequence}. startFrom: ${startFrom}, index: ${index}`);
+  }
   
   // Pad the sequence with leading zeros to 8 digits
   const paddedSequence = newSequence.toString().padStart(8, '0');
