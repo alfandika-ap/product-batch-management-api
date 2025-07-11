@@ -30,6 +30,18 @@ export class BatchController {
     }
   }
 
+  static async getBatchDetail(context: Context) {
+    try {
+
+      const batchId = context.params.id;
+      const batchDetails = await BatchService.getProductBatchById(batchId);
+      return ResponseUtil.success(batchDetails[0], 'Batch detail retrieved successfully');
+    } catch (error) {
+      console.error('Error fetching batch detail:', error);
+      return ResponseUtil.error('Failed to retrieve batch detail', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
   static async getBatchItems(context: Context) {
     try {
 
@@ -162,6 +174,47 @@ export class BatchController {
       }
       console.error('Error deleting batch:', error);
       return ResponseUtil.error('Failed to delete batch', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  static async restoreBatch(context: Context) {
+    try {
+      const batchId = context.params.id;
+      const batchRestored = await BatchService.restoreProductBatch(batchId);
+      
+      if (!batchRestored) {
+        return ResponseUtil.error('Batch not found', 'Batch with the specified ID does not exist');
+      }
+      
+      return ResponseUtil.success(batchRestored, 'Batch restored successfully');
+    } catch (error) {
+      console.error('Error restoring batch:', error);
+      return ResponseUtil.error('Failed to restore batch', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  static async permanentDeleteBatch(context: Context) {
+    try {
+      const batchId = context.params.id;
+      const batchDetails = await BatchService.getProductBatchById(batchId);
+      const batchDeleted = await BatchService.permanentDeleteProductBatch(batchId);
+      
+      if (batchDetails.length) {
+        const item = batchDetails[0];
+        if (item.batchLinkDownload) {
+          const fs = await import('fs');
+          const zipFileName = `batch-${batchId}-qrcodes.zip`;
+          const zipFilePath = `./downloads/${zipFileName}`;
+          if (fs.existsSync(zipFilePath)) {
+            fs.unlinkSync(zipFilePath);
+          }
+        }
+      }
+      
+      return ResponseUtil.success(batchDeleted, 'Batch permanently deleted successfully');
+    } catch (error) {
+      console.error('Error permanently deleting batch:', error);
+      return ResponseUtil.error('Failed to permanently delete batch', error instanceof Error ? error.message : 'Unknown error');
     }
   }
 

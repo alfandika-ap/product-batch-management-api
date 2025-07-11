@@ -66,11 +66,7 @@ export const batchesRoutes = new Elysia({ prefix: "/batches" })
   // Get batch by ID
   .get(
     "/:id",
-    ({ params }) => ({
-      success: true,
-      message: "Batch retrieved successfully",
-      data: { id: params.id },
-    }),
+    BatchController.getBatchDetail,
     {
       params: t.Object({
         id: t.String(),

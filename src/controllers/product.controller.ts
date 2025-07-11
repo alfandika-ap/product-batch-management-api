@@ -95,4 +95,40 @@ export class ProductController {
       );
     }
   }
+
+  static async restoreProduct(context: Context) {
+    try {
+      const product = await ProductService.restoreProduct(context.params.id);
+      
+      if (!product) {
+        return ResponseUtil.error('Product not found', 'Product with the specified ID does not exist');
+      }
+      
+      return ResponseUtil.success(product, 'Product restored successfully');
+    } catch (error) {
+      console.error('Error restoring product:', error);
+      return ResponseUtil.error(
+        'Failed to restore product',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  }
+
+  static async permanentDeleteProduct(context: Context) {
+    try {
+      const product = await ProductService.permanentDeleteProduct(context.params.id);
+      
+      if (!product) {
+        return ResponseUtil.error('Product not found', 'Product with the specified ID does not exist');
+      }
+      
+      return ResponseUtil.success(product, 'Product permanently deleted successfully');
+    } catch (error) {
+      console.error('Error permanently deleting product:', error);
+      return ResponseUtil.error(
+        'Failed to permanently delete product',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  }
 }

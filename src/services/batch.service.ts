@@ -1,10 +1,11 @@
 import { db } from "../db/connection";
-import { count, eq, asc } from "drizzle-orm";
+import { count, eq, asc, isNull, and } from "drizzle-orm";
 import { productBatchesTable, productItemsTable } from "../db/schema";
 import { ProductBatchRequest, ProductItemRequest } from "../types/batch.types";
 import { generateProductBatchItemQueue, updateBatchStatusQueue } from "../taks/queues/generate-product-batch-item-queue";
 import QRCode from 'qrcode'
 import { Jimp } from "jimp";
+import { DateUtil } from '../utils/date.util';
 
 export class BatchService {
   static async getBatches(params: { productId?: string, page?: number, limit?: number }) {
@@ -12,13 +13,20 @@ export class BatchService {
     const limit = params?.limit || 10;
     const offset = (page - 1) * limit;
 
+    // Build conditions for active batches
+    const conditions = [isNull(productBatchesTable.deletedAt)];
+    if (params.productId) {
+      conditions.push(eq(productBatchesTable.productId, params.productId));
+    }
+
     const [{ totalCount }] = await db
       .select({ totalCount: count() })
-      .from(productBatchesTable);
+      .from(productBatchesTable)
+      .where(and(...conditions));
 
     const batches = await db.select()
       .from(productBatchesTable)
-      .where(params.productId ? eq(productBatchesTable.productId, params.productId) : undefined)
+      .where(and(...conditions))
       .limit(limit)
       .offset(offset);
 
@@ -111,12 +119,18 @@ export class BatchService {
   }
 
   static async deleteProductBatch(batchId: string) {
-    const batch = await db.delete(productBatchesTable).where(eq(productBatchesTable.id, batchId));
+    const batch = await db
+      .update(productBatchesTable)
+      .set({ deletedAt: DateUtil.getCurrentUTCTimestamp() })
+      .where(and(eq(productBatchesTable.id, batchId), isNull(productBatchesTable.deletedAt)));
     return batch;
   }
 
   static async getProductBatchById(batchId: string) {
-    const batch = await db.select().from(productBatchesTable).where(eq(productBatchesTable.id, batchId));
+    const batch = await db
+      .select()
+      .from(productBatchesTable)
+      .where(and(eq(productBatchesTable.id, batchId), isNull(productBatchesTable.deletedAt)));
     return batch;
   }
 
@@ -430,5 +444,24 @@ export class BatchService {
       console.error(`Failed to get failed jobs details for batch ${batchId}:`, error);
       return null;
     }
+  }
+
+  /**
+   * Restore a soft-deleted batch
+   */
+  static async restoreProductBatch(batchId: string) {
+    const batch = await db
+      .update(productBatchesTable)
+      .set({ deletedAt: null })
+      .where(eq(productBatchesTable.id, batchId));
+    return batch;
+  }
+
+  /**
+   * Permanently delete a batch (hard delete)
+   */
+  static async permanentDeleteProductBatch(batchId: string) {
+    const batch = await db.delete(productBatchesTable).where(eq(productBatchesTable.id, batchId));
+    return batch;
   }
 }

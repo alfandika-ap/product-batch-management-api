@@ -19,6 +19,7 @@ export const productsTable = mysqlTable('products', {
   imageUrl: varchar('image_url', { length: 500 }),
   description: text(),
   createdAt: timestamp('created_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
 });
 
 export const productBatchesTable = mysqlTable('product_batches', {
@@ -33,6 +34,7 @@ export const productBatchesTable = mysqlTable('product_batches', {
   batchLinkDownload: varchar('batch_link_download', { length: 500 }),
   createdAt: timestamp('created_at').defaultNow(),
   generateProductItemsStatus: mysqlEnum('generate_product_items_status', ['pending', 'completed', 'failed']).default('pending'),
+  deletedAt: timestamp('deleted_at'),
 }, (table) => ({
   productIdx: index('product_idx').on(table.productId),
   batchCodeIdx: index('batch_code_idx').on(table.batchCode),
