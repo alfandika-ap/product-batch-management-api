@@ -154,10 +154,13 @@ async function createProductItemsBatch(
       throw new Error(`Invalid indices: startIndex=${startIndex}, endIndex=${endIndex}`);
     }
     
+    // Calculate relative index for sequential numbering
+    let relativeIndex = 0;
+    
     for (let i = startIndex; i <= endIndex; i++) {
       try {
         const qrCode = generateQRCode(batchId, i, qrCodePrefix);
-        const serialNumber = generateSerialNumber(batch[0].batchCode, i, lastSequence);
+        const serialNumber = generateSerialNumber(batch[0].batchCode, relativeIndex + 1, lastSequence);
         
         // Validate generated data
         if (!qrCode || !serialNumber) {
@@ -170,6 +173,9 @@ async function createProductItemsBatch(
           serialNumber,
           itemOrder: i + 1,
         });
+
+        // Increment relative index for next item
+        relativeIndex++;
       } catch (error) {
         console.error(`Error generating item data for index ${i}:`, error);
         throw new Error(`Failed to generate item data for index ${i}: ${error instanceof Error ? error.message : 'Unknown error'}`);

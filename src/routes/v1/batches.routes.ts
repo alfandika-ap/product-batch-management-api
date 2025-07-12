@@ -315,7 +315,12 @@ export const batchesRoutes = new Elysia({ prefix: "/batches" })
   .post("/", BatchController.createBatch, {
     body: t.Object({
       product_id: t.String({ minimum: 1 }),
-      batch_code: t.String({ minLength: 1, maxLength: 50 }),
+      batch_code: t.String({ 
+        minLength: 1, 
+        maxLength: 50, 
+        pattern: "^[A-Za-z0-9_-]+$",
+        error: "Batch code must only contain letters, numbers, underscores, and hyphens"
+      }),
       quantity: t.Number({ minimum: 1 }),
     }),
     detail: {
@@ -458,7 +463,12 @@ export const batchesRoutes = new Elysia({ prefix: "/batches" })
         id: t.String(),
       }),
       body: t.Object({
-        batch_code: t.Optional(t.String({ minLength: 1, maxLength: 50 })),
+        batch_code: t.Optional(t.String({ 
+          minLength: 1, 
+          maxLength: 50,
+          pattern: "^[A-Za-z0-9_-]+$",
+          error: "Batch code must only contain letters, numbers, underscores, and hyphens"
+        })),
         quantity: t.Optional(t.Number({ minimum: 1 })),
         production_date: t.Optional(t.String({ format: "date" })),
         expiry_date: t.Optional(t.String({ format: "date" })),

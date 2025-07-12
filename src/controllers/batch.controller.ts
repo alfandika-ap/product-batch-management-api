@@ -76,6 +76,10 @@ export class BatchController {
       };
 
       const batch = await BatchService.createProductBatch(batchRequest);
+      if (!batch || !batch.id) {
+        context.set.status = 500;
+        return ResponseUtil.error('Batch already exists', 'Batch already exists');
+      }
       const qty = batchRequest.quantity;
       
       // Use async processing for large quantities
@@ -108,6 +112,7 @@ export class BatchController {
       }
     } catch (error) {
       console.error('Error creating batch:', error);
+      context.set.status = 500;
       return ResponseUtil.error('Failed to create batch', error instanceof Error ? error.message : 'Unknown error');
     }
   }

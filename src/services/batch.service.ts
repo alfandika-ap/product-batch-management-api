@@ -80,7 +80,7 @@ export class BatchService {
       .from(productItemsTable)
       .where(eq(productItemsTable.batchId, batchId))
       .limit(limit)
-      .orderBy(asc(productItemsTable.itemOrder))
+      .orderBy(asc(productItemsTable.serialNumber))
       .offset(offset);
 
     const itemsWithQrCode = await Promise.all(items.map(async (item) => {
@@ -106,11 +106,28 @@ export class BatchService {
   }
 
   static async createProductBatch(data: ProductBatchRequest) {
-    const createBatch = await db.insert(productBatchesTable)
-      .values(data)
-      .$returningId();
-    const batch = await db.select().from(productBatchesTable).where(eq(productBatchesTable.id, createBatch[0].id))
-    return batch[0];
+    try {
+      const createBatch = await db.insert(productBatchesTable)
+        .values(data)
+        .$returningId();
+      
+      if (!createBatch || !createBatch[0]?.id) {
+        throw new Error('Failed to create batch: Database operation returned no ID');
+      }
+
+      const batch = await db.select()
+        .from(productBatchesTable)
+        .where(eq(productBatchesTable.id, createBatch[0].id));
+
+      if (!batch || batch.length === 0) {
+        throw new Error('Failed to retrieve created batch');
+      }
+
+      return batch[0];
+    } catch (error) {
+      console.error('Error in createProductBatch:', error);
+      throw error; // Re-throw to be caught by the controller
+    }
   }
 
   static async updateProductBatch(batchId: string, data: ProductBatchRequest) {
